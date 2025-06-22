@@ -1,0 +1,1 @@
+"""External services integration (OpenAI, Google, Anthropic).""" 
