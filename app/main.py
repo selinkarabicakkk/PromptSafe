@@ -1,14 +1,16 @@
 """Main application module for PromptSafe."""
 import time
+import uuid
 from typing import Callable
 
-from fastapi import FastAPI, Request, Response
+from fastapi import FastAPI, Request, Response, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
 from loguru import logger
 
 from app import __version__
 from app.api.endpoints import router as api_router
 from app.core.config import settings
+from app.proxy.browser_extension import browser_extension_manager
 
 
 # FastAPI uygulaması oluştur
@@ -70,4 +72,28 @@ async def root():
         "version": __version__,
         "description": "Yapay zeka modellerinden hassas veri koruması sağlayan güvenlik middleware API'si",
         "docs_url": "/docs",
-    } 
+    }
+
+
+@app.websocket("/ws/{client_id}")
+async def websocket_endpoint(websocket: WebSocket, client_id: str):
+    """
+    WebSocket endpoint for browser extension.
+    
+    Args:
+        websocket: WebSocket connection
+        client_id: Client identifier
+    """
+    # Rastgele bir client_id yoksa oluştur
+    if not client_id or client_id == "undefined":
+        client_id = str(uuid.uuid4())
+    
+    # Bağlantıyı kabul et
+    await browser_extension_manager.connect(websocket, client_id)
+    
+    try:
+        # Mesajları işle
+        await browser_extension_manager.handle_message(websocket, client_id)
+    except WebSocketDisconnect:
+        # Bağlantı koptuğunda
+        browser_extension_manager.disconnect(client_id) 
